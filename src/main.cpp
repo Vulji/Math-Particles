@@ -29,28 +29,33 @@ struct Particle
 };
 
 bool segment_intersect(const glm::vec2& p1, const glm::vec2& p2,
-                               const glm::vec2& q1, const glm::vec2& q2,
-                               glm::vec2& intersection)
-        {
-            glm::vec2 r = p2 - p1;
-            glm::vec2 s = q2 - q1;
-            float denom = r.x * s.y - r.y * s.x;
-            if (std::abs(denom) < 1e-8f) return false; 
+                       const glm::vec2& q1, const glm::vec2& q2,
+                       glm::vec2& intersection)
+{
+    glm::vec2 r = p2 - p1;
+    glm::vec2 s = q2 - q1;
+    
+    glm::mat2 M(r, -s);
 
-            glm::vec2 qp = q1 - p1;
-            float t = (qp.x * s.y - qp.y * s.x) / denom;
-            float u = (qp.x * r.y - qp.y * r.x) / denom;
+    float det = glm::determinant(M);
+    if (std::abs(det) < 1e-8f) return false;
 
-            if (t >= 0.f && t <= 1.f && u >= 0.f && u <= 1.f) {
-                intersection = p1 + t * r;
-                return true;
-            }
-            return false;
-        }
+    glm::vec2 qp = q1 - p1;
+    glm::vec2 tu = glm::inverse(M) * qp;
+
+    float t = tu.x;
+    float u = tu.y;
+
+    if (t >= 0.f && t <= 1.f && u >= 0.f && u <= 1.f) {
+        intersection = p1 + t * r;
+        return true;
+    }
+    return false;
+}
 
 int main()
 {
-    gl::init("Particules – easing");
+    gl::init("Particules - reflect");
     gl::maximize_window();
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
