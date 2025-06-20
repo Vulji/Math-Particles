@@ -28,6 +28,26 @@ struct Particle
     float     life_time;
 };
 
+bool segment_intersect(const glm::vec2& p1, const glm::vec2& p2,
+                               const glm::vec2& q1, const glm::vec2& q2,
+                               glm::vec2& intersection)
+        {
+            glm::vec2 r = p2 - p1;
+            glm::vec2 s = q2 - q1;
+            float denom = r.x * s.y - r.y * s.x;
+            if (std::abs(denom) < 1e-8f) return false; 
+
+            glm::vec2 qp = q1 - p1;
+            float t = (qp.x * s.y - qp.y * s.x) / denom;
+            float u = (qp.x * r.y - qp.y * r.x) / denom;
+
+            if (t >= 0.f && t <= 1.f && u >= 0.f && u <= 1.f) {
+                intersection = p1 + t * r;
+                return true;
+            }
+            return false;
+        }
+
 int main()
 {
     gl::init("Particules – easing");
@@ -67,6 +87,20 @@ int main()
         glClearColor(0.f, 0.f, 0.f, 1.f);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        glm::vec2 segA1 = {-gl::window_aspect_ratio(), 0.f};
+        glm::vec2 segA2 = {gl::window_aspect_ratio(), 0.f};
+        glm::vec2 segB1 = {0.f, -1.f};
+        glm::vec2 segB2 = gl::mouse_position();
+
+        utils::draw_line(segA1, segA2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
+        utils::draw_line(segB1, segB2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
+
+        glm::vec2 inter;
+        if (segment_intersect(segA1, segA2, segB1, segB2, inter)) {
+            utils::draw_disk(inter, 0.03f, {1.f, 0.f, 0.f, 1.f});
+        }
+
+
         auto it = particles.begin();
         while (it != particles.end()) {
             it->age += dt;
@@ -89,6 +123,5 @@ int main()
             }
         }
     }
-
     return 0;
 }
