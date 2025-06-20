@@ -69,6 +69,8 @@ int main()
     const float initialRadius = 0.05f;
     const glm::vec4 startColor = {1.f, 0.f, 0.f, 1.f};
     const glm::vec4 endColor   = {0.f, 0.f, 1.f, 1.f};
+    const glm::vec2 segA1 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
+    const glm::vec2 segA2 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
 
     std::vector<Particle> particles;
     particles.reserve(100);
@@ -86,47 +88,46 @@ int main()
         particles.push_back(p);
     }
 
-    while (gl::window_is_open())
-    {
-        float dt = gl::delta_time_in_seconds();
-        glClearColor(0.f, 0.f, 0.f, 1.f);
-        glClear(GL_COLOR_BUFFER_BIT);
+while (gl::window_is_open())
+{
+    float dt = gl::delta_time_in_seconds();
+    glClearColor(0.f, 0.f, 0.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
 
-        glm::vec2 segA1 = {-gl::window_aspect_ratio(), 0.f};
-        glm::vec2 segA2 = {gl::window_aspect_ratio(), 0.f};
-        glm::vec2 segB1 = {0.f, -1.f};
-        glm::vec2 segB2 = gl::mouse_position();
+    utils::draw_line(segA1, segA2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
 
-        utils::draw_line(segA1, segA2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
-        utils::draw_line(segB1, segB2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
+    auto it = particles.begin();
+    while (it != particles.end()) {
+       glm::vec2 old_position = it->position;
+glm::vec2 displacement = it->velocity * dt;
+glm::vec2 new_position = old_position + displacement;
 
-        glm::vec2 inter;
-        if (segment_intersect(segA1, segA2, segB1, segB2, inter)) {
-            utils::draw_disk(inter, 0.03f, {1.f, 0.f, 0.f, 1.f});
-        }
+glm::vec2 inter;
+bool hit = segment_intersect(segA1, segA2, old_position, new_position, inter);
 
+if (hit) {
+    float distToHit = glm::distance(old_position, inter);
+    float totalDist = glm::length(displacement);
+    float distRemaining = totalDist - distToHit;
 
-        auto it = particles.begin();
-        while (it != particles.end()) {
-            it->age += dt;
-            if (it->age > it->life_time) {
-                it = particles.erase(it);
-            } else {
-                it->position += it->velocity * dt;
-                float tColorRaw = glm::clamp(it->age / it->life_time, 0.f, 1.f);
-                float tColorEased = easeInOutPower(tColorRaw, 2.f);
-                glm::vec4 color = glm::mix(startColor, endColor, tColorEased);
-                float tShrinkRaw = glm::clamp((it->age - (it->life_time - 2.f)) / 2.f, 0.f, 1.f);
-                float tShrinkBounced = bounceEase(tShrinkRaw);
-                float radius = initialRadius * (1.f - tShrinkBounced);
-                if (it->position.x >  gl::window_aspect_ratio())  it->position.x = -gl::window_aspect_ratio();
-                if (it->position.x < -gl::window_aspect_ratio())  it->position.x =  gl::window_aspect_ratio();
-                if (it->position.y >  1.f)                        it->position.y = -1.f;
-                if (it->position.y < -1.f)                        it->position.y =  1.f;
-                utils::draw_disk(it->position, radius, color);
-                ++it;
-            }
-        }
+    glm::vec2 wall_dir = glm::normalize(segA2 - segA1);
+    glm::vec2 wall_normal = glm::vec2(-wall_dir.y, wall_dir.x);
+    it->velocity = glm::reflect(it->velocity, wall_normal);
+
+    it->position = inter + glm::normalize(it->velocity) * distRemaining;
+} else {
+    it->position = new_position;
+}
+
+        if (it->position.x >  gl::window_aspect_ratio())  it->position.x = -gl::window_aspect_ratio();
+        if (it->position.x < -gl::window_aspect_ratio())  it->position.x =  gl::window_aspect_ratio();
+        if (it->position.y >  1.f)                        it->position.y = -1.f;
+        if (it->position.y < -1.f)                        it->position.y =  1.f;
+
+        utils::draw_disk(it->position, initialRadius, startColor);
+        ++it;
     }
+}
+
     return 0;
 }
