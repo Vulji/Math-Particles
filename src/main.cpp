@@ -19,6 +19,8 @@ float easeInOutPower(float t, float power)
     else           return 1.0f - 0.5f * std::pow(2.0f*(1.0f - t), power);
 }
 
+
+
 struct Particle
 {
     glm::vec2 position;
@@ -53,9 +55,45 @@ bool segment_intersect(const glm::vec2& p1, const glm::vec2& p2,
     return false;
 }
 
+bool segment_circle_intersect(const glm::vec2& p1, const glm::vec2& p2,
+                              const glm::vec2& center, float radius,
+                              glm::vec2& intersection)
+{
+    glm::vec2 d = p2 - p1;
+    glm::vec2 f = p1 - center;
+
+    float a = glm::dot(d, d);
+    float b = 2 * glm::dot(f, d);
+    float c = glm::dot(f, f) - radius * radius;
+
+    float discriminant = b*b - 4*a*c;
+
+    if (discriminant < 0) {
+ 
+        return false;
+    }
+
+    discriminant = std::sqrt(discriminant);
+    float t1 = (-b - discriminant) / (2*a);
+    float t2 = (-b + discriminant) / (2*a);
+
+    if (t1 >= 0 && t1 <= 1) {
+        intersection = p1 + t1 * d;
+        return true;
+    }
+
+    if (t2 >= 0 && t2 <= 1) {
+        intersection = p1 + t2 * d;
+        return true;
+    }
+
+    return false; 
+}
+
+
 int main()
 {
-    gl::init("Particules - reflect");
+    gl::init("Particules - circle");
     gl::maximize_window();
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
@@ -71,6 +109,8 @@ int main()
     const glm::vec4 endColor   = {0.f, 0.f, 1.f, 1.f};
     const glm::vec2 segA1 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
     const glm::vec2 segA2 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
+    glm::vec2 circleCenter = {0.0f, 0.0f};
+    float circleRadius = 0.4f;
 
     std::vector<Particle> particles;
     particles.reserve(100);
@@ -95,38 +135,39 @@ while (gl::window_is_open())
     glClear(GL_COLOR_BUFFER_BIT);
 
     utils::draw_line(segA1, segA2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
+    utils::draw_disk(circleCenter, circleRadius, {0.f, 1.f, 0.f, 0.3f});
 
-    auto it = particles.begin();
-    while (it != particles.end()) {
-       glm::vec2 old_position = it->position;
-glm::vec2 displacement = it->velocity * dt;
-glm::vec2 new_position = old_position + displacement;
+auto it = particles.begin();
+while (it != particles.end()) {
+    glm::vec2 old_position = it->position;
+    glm::vec2 displacement = it->velocity * dt;
+    glm::vec2 new_position = old_position + displacement;
 
-glm::vec2 inter;
-bool hit = segment_intersect(segA1, segA2, old_position, new_position, inter);
+    glm::vec2 inter;
 
-if (hit) {
-    float distToHit = glm::distance(old_position, inter);
-    float totalDist = glm::length(displacement);
-    float distRemaining = totalDist - distToHit;
+    bool hit = segment_circle_intersect(old_position, new_position, circleCenter, circleRadius, inter);
 
-    glm::vec2 wall_dir = glm::normalize(segA2 - segA1);
-    glm::vec2 wall_normal = glm::vec2(-wall_dir.y, wall_dir.x);
-    it->velocity = glm::reflect(it->velocity, wall_normal);
+    if (hit) {
+        float distToHit = glm::distance(old_position, inter);
+        float totalDist = glm::length(displacement);
+        float distRemaining = totalDist - distToHit;
 
-    it->position = inter + glm::normalize(it->velocity) * distRemaining;
-} else {
-    it->position = new_position;
-}
+        glm::vec2 normal = glm::normalize(inter - circleCenter);
+        it->velocity = glm::reflect(it->velocity, normal);
 
-        if (it->position.x >  gl::window_aspect_ratio())  it->position.x = -gl::window_aspect_ratio();
-        if (it->position.x < -gl::window_aspect_ratio())  it->position.x =  gl::window_aspect_ratio();
-        if (it->position.y >  1.f)                        it->position.y = -1.f;
-        if (it->position.y < -1.f)                        it->position.y =  1.f;
-
-        utils::draw_disk(it->position, initialRadius, startColor);
-        ++it;
+        it->position = inter + glm::normalize(it->velocity) * distRemaining;
+    } else {
+        it->position = new_position;
     }
+
+    if (it->position.x >  gl::window_aspect_ratio())  it->position.x = -gl::window_aspect_ratio();
+    if (it->position.x < -gl::window_aspect_ratio())  it->position.x =  gl::window_aspect_ratio();
+    if (it->position.y >  1.f)                        it->position.y = -1.f;
+    if (it->position.y < -1.f)                        it->position.y =  1.f;
+
+    utils::draw_disk(it->position, initialRadius, startColor);
+    ++it;
+}
 }
 
     return 0;
