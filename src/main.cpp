@@ -8,6 +8,7 @@ struct Particle
 {
     glm::vec2 position;
     glm::vec2 velocity;
+    float mass;
 };
 
 int main()
@@ -19,6 +20,9 @@ int main()
 
     const float minSpeed = 0.2f;
     const float maxSpeed = 1.0f;
+    const float minMass  = 0.5f;
+    const float maxMass  = 2.0f;
+    const glm::vec2 gravity = {0.f, -0.5f};
 
     std::vector<Particle> particles;
     particles.reserve(100);
@@ -32,6 +36,7 @@ int main()
         float angle = utils::rand(0.f, 2.f * glm::pi<float>());
         float speed = utils::rand(minSpeed, maxSpeed);
         p.velocity = glm::vec2(std::cos(angle), std::sin(angle)) * speed;
+        p.mass = utils::rand(minMass, maxMass);
         particles.push_back(p);
     }
 
@@ -45,11 +50,16 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         for (auto& p : particles) {
+            glm::vec2 force = gravity * p.mass;
+            glm::vec2 acceleration = force / p.mass;
+            p.velocity += acceleration * dt;
             p.position += p.velocity * dt;
+
             if (p.position.x >  gl::window_aspect_ratio())  p.position.x = -gl::window_aspect_ratio();
             if (p.position.x < -gl::window_aspect_ratio())  p.position.x =  gl::window_aspect_ratio();
             if (p.position.y >  1.f)                        p.position.y = -1.f;
             if (p.position.y < -1.f)                        p.position.y =  1.f;
+
             utils::draw_disk(p.position, 0.05f, color);
         }
     }
