@@ -5,24 +5,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-float bounceEase(float t)
-{
-    if (t < 4.0f/11.0f)        return (121.0f*t*t)/16.0f;
-    else if (t < 8.0f/11.0f)   return (363.0f/40.0f*t*t) - (99.0f/10.0f*t) + 17.0f/5.0f;
-    else if (t < 9.0f/10.0f)   return (4356.0f/361.0f*t*t) - (35442.0f/1805.0f*t) + 16061.0f/1805.0f;
-    else                       return (54.0f/5.0f*t*t) - (513.0f/25.0f*t) + 268.0f/25.0f;
-}
 
-float easeInOutPower(float t, float power)
-{
-    if (t < 0.5f) return 0.5f * std::pow(2.0f*t, power);
-    else           return 1.0f - 0.5f * std::pow(2.0f*(1.0f - t), power);
-}
-
-
-
-struct Particle
-{
+struct Particle {
     glm::vec2 position;
     glm::vec2 velocity;
     float     mass;
@@ -30,145 +14,81 @@ struct Particle
     float     life_time;
 };
 
-bool segment_intersect(const glm::vec2& p1, const glm::vec2& p2,
-                       const glm::vec2& q1, const glm::vec2& q2,
-                       glm::vec2& intersection)
+
+void spawnParticleInRectangle(std::vector<Particle>& particles,
+                              const glm::vec2& min, const glm::vec2& max)
 {
-    glm::vec2 r = p2 - p1;
-    glm::vec2 s = q2 - q1;
-    
-    glm::mat2 M(r, -s);
-
-    float det = glm::determinant(M);
-    if (std::abs(det) < 1e-8f) return false;
-
-    glm::vec2 qp = q1 - p1;
-    glm::vec2 tu = glm::inverse(M) * qp;
-
-    float t = tu.x;
-    float u = tu.y;
-
-    if (t >= 0.f && t <= 1.f && u >= 0.f && u <= 1.f) {
-        intersection = p1 + t * r;
-        return true;
-    }
-    return false;
+    Particle p;
+    p.position = { utils::rand(min.x, max.x),
+                   utils::rand(min.y, max.y) };
+    float ang   = utils::rand(0.f, 2.f * glm::pi<float>());
+    float spd   = utils::rand(0.2f, 1.0f);
+    p.velocity  = glm::vec2(std::cos(ang), std::sin(ang)) * spd;
+    p.mass      = utils::rand(0.5f, 2.0f);
+    p.age       = 0.f;
+    p.life_time = utils::rand(2.f, 5.f);
+    particles.emplace_back(p);
 }
-
-bool segment_circle_intersect(const glm::vec2& p1, const glm::vec2& p2,
-                              const glm::vec2& center, float radius,
-                              glm::vec2& intersection)
-{
-    glm::vec2 d = p2 - p1;
-    glm::vec2 f = p1 - center;
-
-    float a = glm::dot(d, d);
-    float b = 2 * glm::dot(f, d);
-    float c = glm::dot(f, f) - radius * radius;
-
-    float discriminant = b*b - 4*a*c;
-
-    if (discriminant < 0) {
- 
-        return false;
-    }
-
-    discriminant = std::sqrt(discriminant);
-    float t1 = (-b - discriminant) / (2*a);
-    float t2 = (-b + discriminant) / (2*a);
-
-    if (t1 >= 0 && t1 <= 1) {
-        intersection = p1 + t1 * d;
-        return true;
-    }
-
-    if (t2 >= 0 && t2 <= 1) {
-        intersection = p1 + t2 * d;
-        return true;
-    }
-
-    return false; 
-}
-
 
 int main()
 {
-    gl::init("Particules - circle");
+    gl::init("Particles!");
     gl::maximize_window();
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-    const float minSpeed      = 0.2f;
-    const float maxSpeed      = 1.0f;
-    const float minMass       = 0.5f;
-    const float maxMass       = 2.0f;
-    const float minLife       = 2.0f;
-    const float maxLife       = 5.0f;
-    const float initialRadius = 0.05f;
-    const glm::vec4 startColor = {1.f, 0.f, 0.f, 1.f};
-    const glm::vec4 endColor   = {0.f, 0.f, 1.f, 1.f};
-    const glm::vec2 segA1 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
-    const glm::vec2 segA2 = {utils::rand(-1.f, 1.f), utils::rand(-1.f, 1.f)};
-    glm::vec2 circleCenter = {0.0f, 0.0f};
-    float circleRadius = 0.4f;
+
+    const glm::vec2 rectMin      = {-0.5f, -0.5f};
+    const glm::vec2 rectMax      = { 0.5f,  0.5f};
+    const glm::vec2 circleCenter = { 0.f,    0.f};
+    const float     circleRadius = 0.4f;
+    const float     particleR    = 0.02f;
+    const glm::vec4 startColor   = {1.f, 1.f, 1.f, 1.f};
+    const glm::vec4 rectColor    = {1.f, 1.f, 0.f, 0.5f};
 
     std::vector<Particle> particles;
-    particles.reserve(100);
+    particles.reserve(500);
 
-    for (int i = 0; i < 100; ++i) {
-        Particle p;
-        p.position   = { utils::rand(-gl::window_aspect_ratio(), gl::window_aspect_ratio()),
-                         utils::rand(-1.f, 1.f) };
-        float angle   = utils::rand(0.f, 2.f * glm::pi<float>());
-        float speed   = utils::rand(minSpeed, maxSpeed);
-        p.velocity    = glm::vec2(std::cos(angle), std::sin(angle)) * speed;
-        p.mass        = utils::rand(minMass, maxMass);
-        p.age         = 0.f;
-        p.life_time   = utils::rand(minLife, maxLife);
-        particles.push_back(p);
+
+    for (int i = 0; i < 100; ++i)
+        spawnParticleInRectangle(particles, rectMin, rectMax);
+
+    while (gl::window_is_open())
+    {
+        float dt = gl::delta_time_in_seconds();
+        glClearColor(0.f, 0.f, 0.f, 1.f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+
+
+
+        float thickness = 0.005f;
+        glm::vec2 bl = { rectMin.x, rectMin.y };
+        glm::vec2 br = { rectMax.x, rectMin.y };
+        glm::vec2 tr = { rectMax.x, rectMax.y };
+        glm::vec2 tl = { rectMin.x, rectMax.y };
+        utils::draw_line(bl, br, thickness, rectColor);
+        utils::draw_line(br, tr, thickness, rectColor);
+        utils::draw_line(tr, tl, thickness, rectColor);
+        utils::draw_line(tl, bl, thickness, rectColor);
+
+        spawnParticleInRectangle(particles, rectMin, rectMax);
+
+        for (auto& p : particles)
+        {
+            glm::vec2 oldPos = p.position;
+            glm::vec2 newPos = oldPos + p.velocity * dt;
+            glm::vec2 hit;
+
+            float ar = gl::window_aspect_ratio();
+            if (p.position.x >  ar) p.position.x = -ar;
+            if (p.position.x < -ar) p.position.x =  ar;
+            if (p.position.y >  1.f) p.position.y = -1.f;
+            if (p.position.y < -1.f) p.position.y =  1.f;
+
+            utils::draw_disk(p.position, particleR, startColor);
+        }
     }
-
-while (gl::window_is_open())
-{
-    float dt = gl::delta_time_in_seconds();
-    glClearColor(0.f, 0.f, 0.f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    utils::draw_line(segA1, segA2, 0.01f, {1.f, 1.f, 1.f, 0.5f});
-    utils::draw_disk(circleCenter, circleRadius, {0.f, 1.f, 0.f, 0.3f});
-
-auto it = particles.begin();
-while (it != particles.end()) {
-    glm::vec2 old_position = it->position;
-    glm::vec2 displacement = it->velocity * dt;
-    glm::vec2 new_position = old_position + displacement;
-
-    glm::vec2 inter;
-
-    bool hit = segment_circle_intersect(old_position, new_position, circleCenter, circleRadius, inter);
-
-    if (hit) {
-        float distToHit = glm::distance(old_position, inter);
-        float totalDist = glm::length(displacement);
-        float distRemaining = totalDist - distToHit;
-
-        glm::vec2 normal = glm::normalize(inter - circleCenter);
-        it->velocity = glm::reflect(it->velocity, normal);
-
-        it->position = inter + glm::normalize(it->velocity) * distRemaining;
-    } else {
-        it->position = new_position;
-    }
-
-    if (it->position.x >  gl::window_aspect_ratio())  it->position.x = -gl::window_aspect_ratio();
-    if (it->position.x < -gl::window_aspect_ratio())  it->position.x =  gl::window_aspect_ratio();
-    if (it->position.y >  1.f)                        it->position.y = -1.f;
-    if (it->position.y < -1.f)                        it->position.y =  1.f;
-
-    utils::draw_disk(it->position, initialRadius, startColor);
-    ++it;
-}
-}
 
     return 0;
 }
