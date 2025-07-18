@@ -82,14 +82,13 @@ int main()
     int grabbedIndex = -1;
     const float pickRadius = 0.03f;
 
-    const int TOTAL_PARTICLES = 500;
+    const int TOTAL_PARTICLES = 50;
     std::vector<Particle> particles;
     particles.reserve(TOTAL_PARTICLES);
 
     for (int i = 0; i < TOTAL_PARTICLES; ++i) {
-        float t = utils::rand(0.f, 1.f);
         Particle p;
-        p.t         = t;
+        p.t         = float(i) / float(TOTAL_PARTICLES - 1);
         p.elapsed   = utils::rand(0.f, 1.f);
         p.mass      = utils::rand(0.5f, 2.0f);
         p.age       = 0.f;
