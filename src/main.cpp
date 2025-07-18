@@ -61,21 +61,30 @@ int main()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
     glm::vec2 center = {0.f, 0.f};
-    float     radius = 0.5f;
+    float     scale  = 0.5f;   
+
 
     while (gl::window_is_open())
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        draw_parametric(
+       draw_parametric(
             [&](float t) -> glm::vec2 {
                 
-                float angle = t * 2.f * glm::pi<float>();
-                return center + glm::vec2(std::cos(angle), std::sin(angle)) * radius;
+                float θ = t * 2.f * glm::pi<float>();
+                
+                float x = std::pow(std::sin(θ), 3.f);
+                
+                float y = (13.f*std::cos(θ)
+                         - 5.f*std::cos(2.f*θ)
+                         - 2.f*std::cos(3.f*θ)
+                         -     std::cos(4.f*θ)
+                        ) / 16.f;
+                return center + scale * glm::vec2(x, y);
             },
-            128,
-            0.004f,
-            {1,1,0,1}
+            512,
+            0.003f,
+            {1,1,1,1}
         );
     }
 
