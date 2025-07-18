@@ -10,12 +10,12 @@
 
 struct Particle {
     glm::vec2 position;
+    float     t;
     float     mass;
     float     elapsed;
     float     age;
     float     life_time;
 };
-
 
 void spawnParticleInDiskAnalytic(std::vector<Particle>& particles,
                                  const glm::vec2& center,
@@ -36,20 +36,6 @@ void spawnParticleInDiskAnalytic(std::vector<Particle>& particles,
     p.age       = 0.f;
     p.life_time = utils::rand(2.f, 5.f);
     particles.emplace_back(p);
-}
-
-inline glm::vec2 bezier1_bernstein(const glm::vec2& p0, const glm::vec2& p1, float t)
-{
-    float u = 1.f - t;
-    return p0 * u + p1 * t;
-}
-
-inline glm::vec2 bezier2_bernstein(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& p2, float t)
-{
-    float u = 1.f - t;
-    return p0 * (u*u)
-         + p1 * (2.f * u * t)
-         + p2 * (t*t);
 }
 
 inline glm::vec2 bezier3_bernstein(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& p3, float t)
@@ -73,16 +59,6 @@ void draw_parametric(std::function<glm::vec2(float)> const& p, int segments = 12
     }
 }
 
-void draw_bezier1(const glm::vec2& p0, const glm::vec2& p1, int segments = 64, glm::vec4 color = {1,0,0,1})
-{
-    draw_parametric([&](float t){ return bezier1_bernstein(p0, p1, t); }, segments, 0.004f, color);
-}
-
-void draw_bezier2(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& p2, int segments = 128, glm::vec4 color = {0,1,0,1})
-{
-    draw_parametric([&](float t){ return bezier2_bernstein(p0, p1, p2, t); }, segments, 0.004f, color);
-}
-
 void draw_bezier3(const glm::vec2& p0, const glm::vec2& p1, const glm::vec2& p2, const glm::vec2& p3, int segments = 256, glm::vec4 color = {0,0,1,1})
 {
     draw_parametric([&](float t){ return bezier3_bernstein(p0, p1, p2, p3, t); }, segments, 0.004f, color);
@@ -95,13 +71,35 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
-    std::vector<glm::vec2> curve1 = {{-0.8f, -0.5f}, {-0.3f,  0.2f}};
-    std::vector<glm::vec2> curve2 = {{ 0.1f, -0.4f}, { 0.4f,  0.6f}, { 0.7f, -0.1f}};
-    std::vector<glm::vec2> curve3 = {{-0.6f,  0.7f}, {-0.2f, -0.2f}, { 0.3f,  0.8f}, {0.8f, 0.3f}};
+    std::vector<glm::vec2> curve = {
+        {-0.6f,  0.7f},
+        {-0.2f, -0.2f},
+        { 0.3f,  0.8f},
+        { 0.8f,  0.3f}
+    };
 
-    int grabbedCurve = -1;
+    int grabbedCurve = 3;
     int grabbedIndex = -1;
-    float pickRadius = 0.03f;
+    const float pickRadius = 0.03f;
+
+    const int TOTAL_PARTICLES = 500;
+    std::vector<Particle> particles;
+    particles.reserve(TOTAL_PARTICLES);
+
+    for (int i = 0; i < TOTAL_PARTICLES; ++i) {
+        float t = utils::rand(0.f, 1.f);
+        Particle p;
+        p.t         = t;
+        p.elapsed   = utils::rand(0.f, 1.f);
+        p.mass      = utils::rand(0.5f, 2.0f);
+        p.age       = 0.f;
+        p.life_time = utils::rand(2.f, 5.f);
+        particles.emplace_back(p);
+    }
+
+    const float beatFreq   = 1.5f;
+    const float beatAmp    = 0.3f;
+    const float baseRadius = 0.02f;
 
     while (gl::window_is_open())
     {
@@ -109,38 +107,34 @@ int main()
 
         glm::vec2 m = gl::mouse_position();
 
-        if (grabbedCurve < 0)
-        {
-            auto tryHover = [&](auto& c, int cid){
-                for (int i = 0; i < (int)c.size(); ++i)
-                    if (glm::length(c[i] - m) < pickRadius)
-                    {
-                        grabbedCurve = cid;
-                        grabbedIndex = i;
-                        return true;
-                    }
-                return false;
-            };
-            if      (tryHover(curve1,1)){}
-            else if (tryHover(curve2,2)){}
-            else if (tryHover(curve3,3)){}
+        if (grabbedIndex < 0) {
+            for (int i = 0; i < 4; ++i) {
+                if (glm::length(curve[i] - m) < pickRadius) {
+                    grabbedIndex = i;
+                    break;
+                }
+            }
         }
-        else
-        {
-            auto& c = (grabbedCurve==1?curve1:grabbedCurve==2?curve2:curve3);
-            if (glm::length(c[grabbedIndex] - m) < pickRadius)
-                c[grabbedIndex] = m;
+        else {
+            if (glm::length(curve[grabbedIndex] - m) < pickRadius)
+                curve[grabbedIndex] = m;
             else
-                grabbedCurve = grabbedIndex = -1;
+                grabbedIndex = -1;
         }
 
-        draw_bezier1(curve1[0], curve1[1], 64,   {1,0,0,1});
-        draw_bezier2(curve2[0], curve2[1], curve2[2], 128, {0,1,0,1});
-        draw_bezier3(curve3[0], curve3[1], curve3[2], curve3[3], 256, {0,0,1,1});
+        draw_bezier3(curve[0], curve[1], curve[2], curve[3], 256, {0,0,1,1});
+        for (auto& p : curve) utils::draw_disk(p, pickRadius*0.7f, {0,0,1,1});
 
-        for (auto& p : curve1) utils::draw_disk(p, pickRadius*0.7f, {1,0,0,1});
-        for (auto& p : curve2) utils::draw_disk(p, pickRadius*0.7f, {0,1,0,1});
-        for (auto& p : curve3) utils::draw_disk(p, pickRadius*0.7f, {0,0,1,1});
+        for (auto& pt : particles) {
+            pt.elapsed += gl::delta_time_in_seconds();
+            glm::vec2 pos = bezier3_bernstein(
+                curve[0], curve[1], curve[2], curve[3], pt.t
+            );
+            float scale = 1.f + beatAmp
+                * std::sin(2.f * glm::pi<float>() * beatFreq * pt.elapsed);
+            float r = baseRadius * scale;
+            utils::draw_disk(pos, r, {1,1,1,1});
+        }
     }
 
     return 0;
