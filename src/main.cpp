@@ -50,6 +50,7 @@ inline glm::vec2 bezier3_bernstein(const glm::vec2& p0, const glm::vec2& p1, con
          + p3 * (t*t*t);
 }
 
+
 void draw_parametric(std::function<glm::vec2(float)> const& p, int segments = 128, float thickness = 0.003f, glm::vec4 color = {1,1,1,1})
 {
     glm::vec2 prev = p(0.f);
@@ -77,6 +78,33 @@ inline glm::vec2 bezier3_tangent(const glm::vec2& p0,
     return 3.f * (u*u) * (p1 - p0)
          + 6.f * u * t   * (p2 - p1)
          + 3.f * (t*t)   * (p3 - p2);
+}
+
+float findClosestT(const glm::vec2& p0,
+                   const glm::vec2& p1,
+                   const glm::vec2& p2,
+                   const glm::vec2& p3,
+                   const glm::vec2& P)
+{
+    
+    const int SAMPLES = 20;
+    float bestT = 0.f;
+    float bestD = std::numeric_limits<float>::infinity();
+    for (int i = 0; i <= SAMPLES; ++i) {
+        float t = float(i)/float(SAMPLES);
+        float d = glm::distance2(bezier3_bernstein(p0,p1,p2,p3,t), P);
+        if (d < bestD) { bestD = d; bestT = t; }
+    }
+    
+    float t = bestT;
+    const float alpha = 0.1f;
+    for (int iter = 0; iter < 50; ++iter) {
+        glm::vec2 B = bezier3_bernstein(p0,p1,p2,p3,t);
+        glm::vec2 T = bezier3_tangent(p0,p1,p2,p3,t);
+        float grad = 2.f * glm::dot(B - P, T);
+        t = glm::clamp(t - alpha * grad, 0.f, 1.f);
+    }
+    return t;
 }
 
 int main()
@@ -149,6 +177,12 @@ int main()
         draw_bezier3(curve[0],curve[1],curve[2],curve[3], 256, {0,0,1,1});
         for (auto& cp : curve)
             utils::draw_disk(cp, pickRadius*0.7f, {0,0,1,1});
+
+        float tClosest = findClosestT(
+            curve[0],curve[1],curve[2],curve[3], m);
+            glm::vec2 Pclosest = bezier3_bernstein(
+            curve[0],curve[1],curve[2],curve[3], tClosest);
+            utils::draw_disk(Pclosest, 0.02f, {0,1,0,1});
 
         for (auto& pt : particles) {
 
