@@ -15,26 +15,28 @@ struct Particle {
 };
 
 
-void spawnParticleInDisk(std::vector<Particle>& particles,
-                         const glm::vec2& center,
-                         float R)
+void spawnParticleInDiskRejection(std::vector<Particle>& particles,
+                                  const glm::vec2& center,
+                                  float R)
 {
-    float theta = utils::rand(0.f, 2.f * glm::pi<float>());
+    glm::vec2 pos;
 
-    float u = utils::rand(0.f, 1.f);
-    float r = R * (1.f - std::sqrt(u));
-
-    glm::vec2 pos = center + glm::vec2(std::cos(theta), std::sin(theta)) * r;
+    do {
+        float x = utils::rand(-R, R);
+        float y = utils::rand(-R, R);
+        pos = center + glm::vec2(x, y);
+    } while (glm::dot(pos - center, pos - center) > R*R);
 
     Particle p;
     p.position  = pos;
-    p.elapsed   = utils::rand(0.f, 1.f);           
+    p.elapsed   = utils::rand(0.f, 1.f);
     p.mass      = utils::rand(0.5f, 2.0f);
     p.age       = 0.f;
     p.life_time = utils::rand(2.f, 5.f);
 
     particles.emplace_back(p);
 }
+
 
 int main()
 {
@@ -51,7 +53,7 @@ int main()
     particles.reserve(TOTAL_PARTICLES);
 
     for (int i = 0; i < TOTAL_PARTICLES; ++i)
-        spawnParticleInDisk(particles, center, R);
+        spawnParticleInDiskRejection(particles, center, R);
 
     
     while (gl::window_is_open())
